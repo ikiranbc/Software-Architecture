@@ -1,0 +1,13 @@
+{
+  "name": "@hotel-booking/notification-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "@hotel-booking/event-contracts": "1.0.0",
+    "@hotel-booking/shared-utils": "1.0.0",
+    "mongoose": "^8.2.2"
+  }
+}

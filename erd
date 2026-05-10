@@ -1,0 +1,103 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="ERD - Hotel Booking System">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- USER -->
+        <mxCell id="user" value="User&#xa;- _id&#xa;- name&#xa;- email&#xa;- password&#xa;- role (USER/ADMIN/SUPERADMIN)&#xa;- status" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="200" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- WALLET -->
+        <mxCell id="wallet" value="Wallet&#xa;- _id&#xa;- userId&#xa;- balance" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="300" y="40" width="180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- TRANSACTION -->
+        <mxCell id="transaction" value="Transaction&#xa;- _id&#xa;- walletId&#xa;- type&#xa;- amount&#xa;- status" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="300" y="180" width="180" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- HOTEL -->
+        <mxCell id="hotel" value="Hotel&#xa;- _id&#xa;- name&#xa;- location&#xa;- ownerId&#xa;- status" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;" vertex="1" parent="1">
+          <mxGeometry x="520" y="40" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- ROOM -->
+        <mxCell id="room" value="Room&#xa;- _id&#xa;- hotelId&#xa;- type&#xa;- price&#xa;- isAvailable" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;" vertex="1" parent="1">
+          <mxGeometry x="520" y="200" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- BOOKING -->
+        <mxCell id="booking" value="Booking&#xa;- _id&#xa;- userId&#xa;- hotelId&#xa;- status&#xa;- totalPrice&#xa;- createdAt" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;" vertex="1" parent="1">
+          <mxGeometry x="780" y="40" width="220" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- BOOKING ROOM (M:N) -->
+        <mxCell id="booking_room" value="BookingRoom&#xa;- _id&#xa;- bookingId&#xa;- roomId&#xa;- price" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;" vertex="1" parent="1">
+          <mxGeometry x="780" y="220" width="220" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- PAYMENT -->
+        <mxCell id="payment" value="Payment&#xa;- _id&#xa;- bookingId&#xa;- method&#xa;- amount&#xa;- status&#xa;- transactionRef" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="40" width="220" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- NOTIFICATION -->
+        <mxCell id="notification" value="Notification&#xa;- _id&#xa;- userId&#xa;- type&#xa;- message&#xa;- status" style="rounded=1;whiteSpace=wrap;fillColor=#d0e0e3;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="220" width="220" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- RELATIONSHIPS -->
+
+        <!-- User -> Wallet -->
+        <mxCell id="e1" edge="1" parent="1" source="user" target="wallet" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Wallet -> Transaction -->
+        <mxCell id="e2" edge="1" parent="1" source="wallet" target="transaction" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- User -> Booking -->
+        <mxCell id="e3" edge="1" parent="1" source="user" target="booking" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Hotel -> Room -->
+        <mxCell id="e4" edge="1" parent="1" source="hotel" target="room" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Hotel -> Booking -->
+        <mxCell id="e5" edge="1" parent="1" source="hotel" target="booking" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Booking -> BookingRoom -->
+        <mxCell id="e6" edge="1" parent="1" source="booking" target="booking_room" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Room -> BookingRoom -->
+        <mxCell id="e7" edge="1" parent="1" source="room" target="booking_room" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Booking -> Payment -->
+        <mxCell id="e8" edge="1" parent="1" source="booking" target="payment" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- User -> Notification -->
+        <mxCell id="e9" edge="1" parent="1" source="user" target="notification" style="endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

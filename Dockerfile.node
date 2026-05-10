@@ -1,0 +1,10 @@
+FROM node:20-alpine
+
+ARG WORKSPACE
+ENV WORKSPACE=${WORKSPACE}
+
+WORKDIR /app
+COPY . .
+RUN npm install
+
+CMD ["sh", "-c", "npm run dev -w ${WORKSPACE}"]

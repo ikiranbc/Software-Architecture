@@ -1,0 +1,193 @@
+services:
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: apps/client
+    environment:
+      HOST: 0.0.0.0
+      VITE_API_BASE_URL: http://localhost:${GATEWAY_PORT:-8790}
+    ports:
+      - "${CLIENT_PORT:-5173}:5173"
+    depends_on:
+      - api-gateway
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: apps/api-gateway
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      DEBUG_AUTH: ${DEBUG_AUTH:-0}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      USER_SERVICE_URL: http://user-service:4002
+      HOTEL_SERVICE_URL: http://hotel-service:4003
+      BOOKING_SERVICE_URL: http://booking-service:4004
+      WALLET_SERVICE_URL: http://wallet-service:4005
+      ADMIN_SERVICE_URL: http://admin-service:4006
+    ports:
+      - "${GATEWAY_PORT:-8790}:8080"
+    depends_on:
+      - auth-service
+      - user-service
+      - hotel-service
+      - booking-service
+      - wallet-service
+      - admin-service
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/auth-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4001
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+    ports:
+      - "4001:4001"
+    depends_on:
+      - mongodb
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/user-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4002
+      DEBUG_AUTH: ${DEBUG_AUTH:-0}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+    ports:
+      - "4002:4002"
+    depends_on:
+      - mongodb
+
+  hotel-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/hotel-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4003
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    ports:
+      - "4003:4003"
+    depends_on:
+      - mongodb
+      - redis
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/booking-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4004
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
+      BOOKING_SERVICE_URL: http://booking-service:4004
+      HOTEL_SERVICE_URL: http://hotel-service:4003
+    ports:
+      - "4004:4004"
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+      - hotel-service
+
+  wallet-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/wallet-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4005
+      DEBUG_AUTH: ${DEBUG_AUTH:-0}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
+      BOOKING_SERVICE_URL: http://booking-service:4004
+    ports:
+      - "4005:4005"
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/admin-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4006
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+    ports:
+      - "4006:4006"
+    depends_on:
+      - mongodb
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        WORKSPACE: services/notification-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4007
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/hotel_booking}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
+    ports:
+      - "4007:4007"
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  mongo-data:

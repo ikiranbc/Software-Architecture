@@ -1,0 +1,17 @@
+{
+  "name": "@hotel-booking/api-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "@hotel-booking/rbac": "1.0.0",
+    "@hotel-booking/shared-utils": "1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "http-proxy-middleware": "^3.0.0"
+  }
+}

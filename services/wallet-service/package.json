@@ -1,0 +1,15 @@
+{
+  "name": "@hotel-booking/wallet-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "@hotel-booking/event-contracts": "1.0.0",
+    "@hotel-booking/shared-utils": "1.0.0",
+    "bullmq": "^5.4.0",
+    "mongoose": "^8.2.2",
+    "zod": "^3.22.4"
+  }
+}

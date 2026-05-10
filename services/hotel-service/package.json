@@ -1,0 +1,13 @@
+{
+  "name": "@hotel-booking/hotel-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "@hotel-booking/shared-utils": "1.0.0",
+    "mongoose": "^8.2.2",
+    "zod": "^3.22.4"
+  }
+}
