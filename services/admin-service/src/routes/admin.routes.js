@@ -21,9 +21,11 @@ const router = Router();
 router.post("/api/admin/hotels", requireUser, requireAdminRole, validateBody(createHotelSchema), asyncHandler(adminController.createHotel));
 router.get("/api/admin/hotels", requireUser, requireAdminRole, asyncHandler(adminController.listHotels));
 router.patch("/api/admin/hotels/:hotelId", requireUser, requireAdminRole, validateBody(patchHotelSchema), asyncHandler(adminController.patchHotel));
+router.delete("/api/admin/hotels/:hotelId", requireUser, requireAdminRole, asyncHandler(adminController.removeHotel));
 router.post("/api/admin/hotels/:hotelId/rooms", requireUser, requireAdminRole, validateBody(createRoomSchema), asyncHandler(adminController.createRoom));
 router.get("/api/admin/hotels/:hotelId/rooms", requireUser, requireAdminRole, asyncHandler(adminController.listHotelRooms));
 router.patch("/api/admin/rooms/:roomId", requireUser, requireAdminRole, validateBody(patchRoomSchema), asyncHandler(adminController.patchRoom));
+router.delete("/api/admin/rooms/:roomId", requireUser, requireAdminRole, asyncHandler(adminController.removeRoom));
 router.get("/api/admin/bookings", requireUser, requireAdminRole, asyncHandler(adminController.listBookings));
 router.get("/api/admin/revenue", requireUser, requireAdminRole, asyncHandler(adminController.revenue));
 

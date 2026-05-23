@@ -4,6 +4,7 @@ import { Hotel } from "../models/hotel.model.js";
 import { Room } from "../models/room.model.js";
 import { Transaction } from "../models/transaction.model.js";
 import { User } from "../models/user.model.js";
+import { getRedis } from "@hotel-booking/shared-utils";
 
 export function createHotel(payload) {
   return Hotel.create(payload);
@@ -15,6 +16,10 @@ export function findHotelById(hotelId) {
 
 export function updateHotelById(hotelId, payload) {
   return Hotel.findByIdAndUpdate(hotelId, payload, { new: true });
+}
+
+export function deactivateRoomsByHotelId(hotelId) {
+  return Room.updateMany({ hotelId }, { isActive: false });
 }
 
 export function listHotels(query = {}) {
@@ -35,6 +40,16 @@ export function updateRoomById(roomId, payload) {
 
 export function listRooms(query = {}) {
   return Room.find(query).sort({ createdAt: -1 });
+}
+
+export async function invalidateHotelListCache() {
+  try {
+    const redis = getRedis();
+    const keys = await redis.keys("hotels:list:*");
+    if (keys.length > 0) await redis.del(keys);
+  } catch (error) {
+    console.warn(`Admin cache invalidation skipped: ${error.message}`);
+  }
 }
 
 export function listBookings(query = {}) {

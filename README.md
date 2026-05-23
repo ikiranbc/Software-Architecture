@@ -126,6 +126,18 @@ Normalize legacy lowercase `role/status` values:
 npm run fix:unblock-user -- --normalize-legacy
 ```
 
+Approve active hotels created before admin-created hotels became auto-approved:
+
+```bash
+node scripts/approve-active-hotels.mjs
+```
+
+Make every hotel and room active:
+
+```bash
+node scripts/activate-all-inventory.mjs
+```
+
 ## Ports
 
 - Client: `5173`

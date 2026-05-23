@@ -67,7 +67,7 @@ export async function listPublicHotels(rawQuery) {
   const cached = await readHotelListCache(cacheKey);
   if (cached) return cached;
 
-  const query = { isActive: true, approvalStatus: "APPROVED" };
+  const query = { isActive: true };
   if (rawQuery.city) query.city = new RegExp(`^${rawQuery.city}$`, "i");
   if (rawQuery.country) query.country = new RegExp(`^${rawQuery.country}$`, "i");
   if (rawQuery.search) query.$text = { $search: rawQuery.search };
@@ -97,7 +97,7 @@ export async function listPublicHotels(rawQuery) {
 
 export async function getPublicHotel(hotelId) {
   const hotel = await findHotelById(hotelId);
-  if (!hotel || !hotel.isActive || hotel.approvalStatus !== "APPROVED") {
+  if (!hotel || !hotel.isActive) {
     throw httpError(404, "Hotel not found", "HOTEL_NOT_FOUND");
   }
   const rooms = await findRooms({ hotelId: hotel._id, isActive: true }, { pricePerNight: 1 });
@@ -116,7 +116,7 @@ export async function getInternalRoom(roomId) {
   const room = await findRoomById(roomId);
   if (!room || !room.isActive) throw httpError(404, "Room not found", "ROOM_NOT_FOUND");
   const hotel = await findHotelById(room.hotelId);
-  if (!hotel || !hotel.isActive || hotel.approvalStatus !== "APPROVED") {
+  if (!hotel || !hotel.isActive) {
     throw httpError(404, "Hotel not found", "HOTEL_NOT_FOUND");
   }
   return { room: serializeRoom(room), hotel: serializeHotel(hotel) };
@@ -124,7 +124,7 @@ export async function getInternalRoom(roomId) {
 
 export async function createOwnerHotel(user, payload) {
   await assertCrudAllowedForUserRole(user);
-  const hotel = await createHotel({ ...payload, ownerId: user.id, approvalStatus: "PENDING" });
+  const hotel = await createHotel({ ...payload, ownerId: user.id, approvalStatus: "APPROVED", isActive: payload.isActive ?? true });
   await invalidateHotelListCache();
   return serializeHotel(hotel);
 }

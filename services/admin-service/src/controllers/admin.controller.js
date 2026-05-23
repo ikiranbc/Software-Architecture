@@ -16,6 +16,11 @@ export async function patchHotel(req, res) {
   res.json(payload);
 }
 
+export async function removeHotel(req, res) {
+  const payload = await adminService.deleteAdminHotel(req.user, req.params.hotelId, auditContext(req));
+  res.json(payload);
+}
+
 export async function createRoom(req, res) {
   const payload = await adminService.createAdminRoom(req.user, req.params.hotelId, req.body, auditContext(req));
   res.status(201).json(payload);
@@ -28,6 +33,11 @@ export async function listHotelRooms(req, res) {
 
 export async function patchRoom(req, res) {
   const payload = await adminService.patchAdminRoom(req.user, req.params.roomId, req.body, auditContext(req));
+  res.json(payload);
+}
+
+export async function removeRoom(req, res) {
+  const payload = await adminService.deleteAdminRoom(req.user, req.params.roomId, auditContext(req));
   res.json(payload);
 }
 

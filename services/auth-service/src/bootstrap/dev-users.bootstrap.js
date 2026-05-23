@@ -25,6 +25,7 @@ async function migrateLegacyUserEnums() {
     ["user", Roles.USER],
     ["admin", Roles.ADMIN],
     ["superadmin", Roles.SUPERADMIN],
+    ["super_admin", Roles.SUPERADMIN],
     ["guest", Roles.USER],
     ["owner", Roles.ADMIN]
   ];

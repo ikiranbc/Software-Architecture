@@ -6,11 +6,13 @@ import {
   createAuditLog,
   createHotel,
   createRoom,
+  deactivateRoomsByHotelId,
   createUser,
   findHotelById,
   findRoomById,
   findUserByEmail,
   findUserById,
+  invalidateHotelListCache,
   listAuditLogs,
   listBookings,
   listHotels,
@@ -148,10 +150,11 @@ export async function createAdminHotel(user, payload, audit) {
   const hotel = await createHotel({
     ownerId: user.id,
     ...payload,
-    approvalStatus: "PENDING",
+    approvalStatus: "APPROVED",
     isActive: payload.isActive ?? true
   });
   await writeAudit("ADMIN_HOTEL_CREATE", "HOTEL", hotel._id.toString(), null, serializeHotel(hotel), audit);
+  await invalidateHotelListCache();
   return serializeHotel(hotel);
 }
 
@@ -169,7 +172,21 @@ export async function patchAdminHotel(user, hotelId, payload, audit) {
   const oldValue = serializeHotel(hotel);
   const updated = await updateHotelById(hotelId, payload);
   await writeAudit("ADMIN_HOTEL_UPDATE", "HOTEL", hotelId, oldValue, serializeHotel(updated), audit);
+  await invalidateHotelListCache();
   return serializeHotel(updated);
+}
+
+export async function deleteAdminHotel(user, hotelId, audit) {
+  const hotel = await findHotelById(hotelId);
+  if (!hotel || !hotel.isActive) throw httpError(404, "Hotel not found", "HOTEL_NOT_FOUND");
+  ensureAdminHotelAccess(hotel, user);
+
+  const oldValue = serializeHotel(hotel);
+  const updated = await updateHotelById(hotelId, { isActive: false });
+  await deactivateRoomsByHotelId(hotelId);
+  await writeAudit("ADMIN_HOTEL_DELETE", "HOTEL", hotelId, oldValue, serializeHotel(updated), audit);
+  await invalidateHotelListCache();
+  return { ok: true };
 }
 
 export async function createAdminRoom(user, hotelId, payload, audit) {
@@ -179,6 +196,7 @@ export async function createAdminRoom(user, hotelId, payload, audit) {
 
   const room = await createRoom({ hotelId, ...payload, isActive: payload.isActive ?? true });
   await writeAudit("ADMIN_ROOM_CREATE", "ROOM", room._id.toString(), null, serializeRoom(room), audit);
+  await invalidateHotelListCache();
   return serializeRoom(room);
 }
 
@@ -201,7 +219,23 @@ export async function patchAdminRoom(user, roomId, payload, audit) {
   const oldValue = serializeRoom(room);
   const updated = await updateRoomById(roomId, payload);
   await writeAudit("ADMIN_ROOM_UPDATE", "ROOM", roomId, oldValue, serializeRoom(updated), audit);
+  await invalidateHotelListCache();
   return serializeRoom(updated);
+}
+
+export async function deleteAdminRoom(user, roomId, audit) {
+  const room = await findRoomById(roomId);
+  if (!room || !room.isActive) throw httpError(404, "Room not found", "ROOM_NOT_FOUND");
+
+  const hotel = await findHotelById(room.hotelId);
+  if (!hotel) throw httpError(404, "Hotel not found", "HOTEL_NOT_FOUND");
+  ensureAdminHotelAccess(hotel, user);
+
+  const oldValue = serializeRoom(room);
+  const updated = await updateRoomById(roomId, { isActive: false });
+  await writeAudit("ADMIN_ROOM_DELETE", "ROOM", roomId, oldValue, serializeRoom(updated), audit);
+  await invalidateHotelListCache();
+  return { ok: true };
 }
 
 export async function listAdminBookings(user) {

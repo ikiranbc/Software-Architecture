@@ -103,6 +103,40 @@ function roomFormFromModel(room) {
   };
 }
 
+function formatDate(value) {
+  if (!value) return "N/A";
+  return new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return "N/A";
+  return new Date(value).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function statusClass(value) {
+  return String(value || "unknown").toLowerCase().replaceAll("_", "-");
+}
+
+function shortId(value) {
+  const text = String(value || "");
+  if (text.length <= 12) return text || "N/A";
+  return `${text.slice(0, 6)}...${text.slice(-4)}`;
+}
+
 function routeFromHash(hasToken) {
   if (typeof window === "undefined") return hasToken ? "overview" : "auth";
   const route = window.location.hash.replace(/^#\/?/, "").trim();
@@ -115,6 +149,7 @@ function normalizeRole(role) {
   if (!value) return "GUEST";
   const upper = value.toUpperCase();
   if (AUTH_ROLES.includes(upper) || upper === "GUEST") return upper;
+  if (upper === "SUPER_ADMIN" || upper === "SUPER ADMIN") return "SUPERADMIN";
   if (upper === "OWNER") return "ADMIN";
   return "USER";
 }
@@ -133,6 +168,8 @@ function App() {
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [bookingFilter, setBookingFilter] = useState("ALL");
+  const [selectedBookingId, setSelectedBookingId] = useState("");
 
   const [bookingDraft, setBookingDraft] = useState({
     checkInDate: new Date().toISOString().slice(0, 10),
@@ -228,8 +265,13 @@ function App() {
     if (typeof window !== "undefined") window.location.hash = `/${nextRoute}`;
   }
 
+  function setRouteDirectly(nextRoute) {
+    setRoute(nextRoute);
+    if (typeof window !== "undefined") window.location.hash = `/${nextRoute}`;
+  }
+
   async function loadHotels() {
-    const payload = await domainApi.hotels.list({ ...query, limit: 20 });
+    const payload = await domainApi.hotels.list({ ...query, limit: 50, cacheBust: Date.now() });
     setHotels(payload.data || []);
   }
 
@@ -260,15 +302,22 @@ function App() {
     setManagerRooms(payload.data || []);
   }
 
+  async function loadBookingsForRole(role) {
+    const normalizedRole = normalizeRole(role);
+    if (normalizedRole === "SUPERADMIN") return domainApi.bookings.listPlatform();
+    if (normalizedRole === "ADMIN") return domainApi.bookings.listManaged();
+    return domainApi.bookings.listMine();
+  }
+
   async function loadPrivateData() {
     if (!token) return;
 
-    const [profilePayload, walletPayload, transactionPayload, bookingPayload] = await Promise.all([
+    const [profilePayload, walletPayload, transactionPayload] = await Promise.all([
       domainApi.users.me(),
       domainApi.wallet.balance(),
-      domainApi.wallet.transactions(),
-      domainApi.bookings.listMine()
+      domainApi.wallet.transactions()
     ]);
+    const bookingPayload = await loadBookingsForRole(profilePayload.role);
 
     setUser(profilePayload);
     localStorage.setItem("hotel_user", JSON.stringify(profilePayload));
@@ -277,6 +326,10 @@ function App() {
     setWallet(walletPayload);
     setTransactions(transactionPayload.data || []);
     setBookings(bookingPayload.data || []);
+    setSelectedBookingId((current) => {
+      if (current && (bookingPayload.data || []).some((booking) => booking.id === current)) return current;
+      return bookingPayload.data?.[0]?.id || "";
+    });
 
     if (INVENTORY_ROLES.includes(normalizeRole(profilePayload.role))) {
       await loadManagerHotels();
@@ -320,6 +373,9 @@ function App() {
 
   useEffect(() => {
     if (!token) return;
+    if (route === "auth") {
+      setRouteDirectly("overview");
+    }
     loadPrivateData().catch((error) => {
       const message = String(error?.message || "");
       if (/unauthor|forbidden|token|401|403/i.test(message)) {
@@ -359,7 +415,7 @@ function App() {
       setUser(payload.user);
       setProfileForm({ name: payload.user.name || "", phone: payload.user.phone || "" });
       setNotice(`Signed in as ${payload.user.name}`);
-      navigate("overview");
+      setRouteDirectly("overview");
     } catch (error) {
       setNotice(error.message);
     } finally {
@@ -540,12 +596,18 @@ function App() {
     if (!ensureInventoryCrudAllowed()) return;
     setLoading(true);
     try {
-      await domainApi.hotels.createHotel({
+      const createdHotel = await domainApi.hotels.createHotel({
         ...createHotelForm,
         amenities: parseAmenities(createHotelForm.amenities)
       });
       setCreateHotelForm({ name: "", city: "", country: "", address: "", description: "", amenities: "" });
       await Promise.all([loadManagerHotels(), loadHotels()]);
+      setHotels((current) => {
+        if (current.some((hotel) => hotel.id === createdHotel.id)) return current;
+        const matchesCity = !query.city || createdHotel.city?.toLowerCase() === query.city.toLowerCase();
+        if (!matchesCity) return current;
+        return [{ ...createdHotel, rooms: [] }, ...current];
+      });
       setNotice("Hotel created");
     } catch (error) {
       setNotice(error.message);
@@ -635,6 +697,20 @@ function App() {
     }
   }
 
+  async function setHotelActive(hotelId, isActive) {
+    if (!ensureInventoryCrudAllowed()) return;
+    setLoading(true);
+    try {
+      await domainApi.hotels.updateHotel(hotelId, { isActive });
+      await Promise.all([loadManagerHotels(), loadHotels()]);
+      setNotice(isActive ? "Hotel activated" : "Hotel deactivated");
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function beginEditRoom(room) {
     if (!ensureInventoryCrudAllowed()) return;
     setRoomEdits((current) => ({ ...current, [room.id]: roomFormFromModel(room) }));
@@ -692,7 +768,57 @@ function App() {
     }
   }
 
+  async function setRoomActive(roomId, isActive) {
+    if (!ensureInventoryCrudAllowed()) return;
+    setLoading(true);
+    try {
+      await domainApi.hotels.updateRoom(roomId, { isActive });
+      await Promise.all([loadManagerRooms(selectedHotelId), loadHotels()]);
+      setNotice(isActive ? "Room activated" : "Room deactivated");
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function cancelBooking(bookingId) {
+    setLoading(true);
+    try {
+      await domainApi.bookings.cancel(bookingId);
+      await loadPrivateData();
+      setNotice("Booking cancelled");
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function renderAuthPage() {
+    if (token && user) {
+      return (
+        <div className="single-page auth-layout">
+          <section className="panel-block auth-intro">
+            <div className="section-title">
+              <ShieldCheck size={18} />
+              <h2>You are already signed in</h2>
+            </div>
+            <p>{user.name} is active as {normalizeRole(user.role)}.</p>
+            <div className="row-actions">
+              <button type="button" className="primary-button" onClick={() => navigate("overview")}>
+                Open Dashboard
+              </button>
+              <button type="button" className="icon-button" onClick={logout}>
+                <LogOut size={16} />
+                <span>Log out</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      );
+    }
+
     return (
       <div className="single-page auth-layout">
         <section className="panel-block auth-intro">
@@ -888,28 +1014,260 @@ function App() {
   }
 
   function renderBookingsPage() {
+    const visibleBookings = bookings.filter((booking) => {
+      if (bookingFilter === "ALL") return true;
+      if (bookingFilter === "ACTIVE") return ["PENDING_PAYMENT", "CONFIRMED"].includes(booking.status);
+      if (bookingFilter === "PAYMENT_ISSUES") return ["FAILED", "CANCELLED"].includes(booking.status) || ["FAILED", "REFUNDED"].includes(booking.paymentStatus);
+      return booking.status === bookingFilter;
+    });
+    const selectedBooking = bookings.find((booking) => booking.id === selectedBookingId) || visibleBookings[0] || bookings[0];
+    const confirmedCount = bookings.filter((booking) => booking.status === "CONFIRMED").length;
+    const pendingCount = bookings.filter((booking) => booking.status === "PENDING_PAYMENT").length;
+    const failedCount = bookings.filter((booking) => ["FAILED", "CANCELLED"].includes(booking.status)).length;
+    const totalRevenue = bookings
+      .filter((booking) => booking.status === "CONFIRMED")
+      .reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
+    const averageBookingValue = confirmedCount > 0 ? totalRevenue / confirmedCount : 0;
+    const selectedProgress = selectedBooking?.status === "CONFIRMED"
+      ? 3
+      : ["FAILED", "CANCELLED"].includes(selectedBooking?.status)
+        ? 3
+        : selectedBooking?.paymentStatus === "PROCESSING"
+          ? 2
+          : 1;
+
     return (
-      <div className="single-page">
-        <div className="panel-block">
+      <div className="single-page booking-dashboard">
+        <div className="booking-hero panel-block">
+          <div>
+            <div className="section-title">
+              <CalendarCheck size={18} />
+              <h1>{activeRole === "SUPERADMIN" ? "Platform Booking Center" : activeRole === "ADMIN" ? "Managed Booking Center" : "Booking Center"}</h1>
+            </div>
+            <p>Track booking lifecycle, payment state, stay details, and operational identifiers from one screen.</p>
+          </div>
+          <div className="booking-hero-actions">
+            <button type="button" className="icon-button" onClick={loadPrivateData} disabled={loading} title="Refresh bookings">
+              <RefreshCw size={16} />
+              <span>Refresh</span>
+            </button>
+            <button type="button" className="primary-button" onClick={() => navigate("hotels")}>
+              New Booking
+            </button>
+          </div>
+        </div>
+
+        <div className="summary-grid booking-summary">
+          <div className="summary-tile">
+            <span>Total Bookings</span>
+            <strong>{bookings.length}</strong>
+          </div>
+          <div className="summary-tile">
+            <span>Confirmed</span>
+            <strong>{confirmedCount}</strong>
+          </div>
+          <div className="summary-tile">
+            <span>Pending</span>
+            <strong>{pendingCount}</strong>
+          </div>
+          <div className="summary-tile">
+            <span>Issues</span>
+            <strong>{failedCount}</strong>
+          </div>
+          <div className="summary-tile">
+            <span>Confirmed Value</span>
+            <strong>{money(totalRevenue)}</strong>
+          </div>
+          <div className="summary-tile">
+            <span>Average Value</span>
+            <strong>{money(averageBookingValue)}</strong>
+          </div>
+        </div>
+
+        <div className="panel-block booking-control-panel">
           <div className="section-title">
             <CalendarCheck size={18} />
-            <h2>Bookings</h2>
+            <h2>{activeRole === "SUPERADMIN" ? "All Platform Bookings" : activeRole === "ADMIN" ? "Managed Bookings" : "My Bookings"}</h2>
           </div>
-          <div className="table-list">
-            {bookings.map((booking) => (
-              <div className="table-row" key={booking.id}>
-                <span>{new Date(booking.checkInDate).toLocaleDateString()} to {new Date(booking.checkOutDate).toLocaleDateString()}</span>
-                <strong className={`status-badge status-${booking.status.toLowerCase().replace("_", "-")}`}>{booking.status}</strong>
-                <span>${booking.totalAmount}</span>
-              </div>
+          <span className="booking-showing-count">
+            Showing {visibleBookings.length} of {bookings.length}
+          </span>
+          <div className="booking-filters">
+            {["ALL", "ACTIVE", "PENDING_PAYMENT", "CONFIRMED", "PAYMENT_ISSUES"].map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                className={bookingFilter === filter ? "active" : ""}
+                onClick={() => setBookingFilter(filter)}
+              >
+                {filter.replaceAll("_", " ")}
+              </button>
             ))}
-            {bookings.length === 0 && <p>No bookings yet.</p>}
+          </div>
+        </div>
+
+        <div className="booking-layout">
+          <div className="booking-list-panel panel-block">
+            <div className="section-title">
+              <Search size={18} />
+              <h2>Booking Queue</h2>
+            </div>
+            <div className="booking-card-list">
+              {visibleBookings.map((booking) => (
+                <button
+                  key={booking.id}
+                  type="button"
+                  className={selectedBooking?.id === booking.id ? "booking-list-card active" : "booking-list-card"}
+                  onClick={() => setSelectedBookingId(booking.id)}
+                >
+                  <span className="booking-list-main">
+                    <strong>{formatDate(booking.checkInDate)} - {formatDate(booking.checkOutDate)}</strong>
+                    <small>#{shortId(booking.id)} · {booking.guests} guests · {booking.nights} nights</small>
+                    <small className="booking-list-payment">Payment: {booking.paymentStatus} · {money(booking.totalAmount)}</small>
+                  </span>
+                  <span className={`status-badge status-${statusClass(booking.status)}`}>{booking.status}</span>
+                </button>
+              ))}
+              {visibleBookings.length === 0 && <p className="empty-state">No bookings match this filter.</p>}
+            </div>
+          </div>
+
+          <div className="booking-detail-panel panel-block">
+            {selectedBooking ? (
+              <>
+                <div className="booking-detail-header">
+                  <div>
+                    <div className="section-title">
+                      <CalendarCheck size={18} />
+                      <h2>Booking Detail</h2>
+                    </div>
+                    <p>Booking #{shortId(selectedBooking.id)}</p>
+                  </div>
+                  <div className="booking-amount-card">
+                    <span>Total</span>
+                    <strong>{money(selectedBooking.totalAmount)}</strong>
+                  </div>
+                  <div className="booking-status-stack">
+                    <span className={`status-badge status-${statusClass(selectedBooking.status)}`}>{selectedBooking.status}</span>
+                    <span className={`status-badge status-${statusClass(selectedBooking.paymentStatus)}`}>{selectedBooking.paymentStatus}</span>
+                  </div>
+                </div>
+
+                <div className="booking-timeline">
+                  {["Created", "Payment", "Final State"].map((step, index) => {
+                    const isDone = index + 1 <= selectedProgress;
+                    return (
+                      <span key={step} className={isDone ? "done" : ""}>
+                        {index + 1}. {step}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="booking-section-title">Stay Details</div>
+                <div className="booking-detail-grid">
+                  <div className="booking-detail-item">
+                    <span>Stay Dates</span>
+                    <strong>{formatDate(selectedBooking.checkInDate)} - {formatDate(selectedBooking.checkOutDate)}</strong>
+                  </div>
+                  <div className="booking-detail-item">
+                    <span>Guests / Nights</span>
+                    <strong>{selectedBooking.guests} guests · {selectedBooking.nights} nights</strong>
+                  </div>
+                  <div className="booking-detail-item">
+                    <span>Total Amount</span>
+                    <strong>{money(selectedBooking.totalAmount)}</strong>
+                  </div>
+                  <div className="booking-detail-item">
+                    <span>Created</span>
+                    <strong>{formatDateTime(selectedBooking.createdAt)}</strong>
+                  </div>
+                </div>
+
+                <div className="booking-section-title">Resource References</div>
+                <div className="booking-detail-grid">
+                  <div className="booking-detail-item">
+                    <span>Hotel ID</span>
+                    <strong title={selectedBooking.hotelId}>{shortId(selectedBooking.hotelId)}</strong>
+                  </div>
+                  <div className="booking-detail-item">
+                    <span>Room ID</span>
+                    <strong title={selectedBooking.roomId}>{shortId(selectedBooking.roomId)}</strong>
+                  </div>
+                  {(activeRole === "ADMIN" || activeRole === "SUPERADMIN") && (
+                    <>
+                      <div className="booking-detail-item">
+                        <span>User ID</span>
+                        <strong title={selectedBooking.userId}>{shortId(selectedBooking.userId)}</strong>
+                      </div>
+                      <div className="booking-detail-item">
+                        <span>Owner ID</span>
+                        <strong title={selectedBooking.ownerId}>{shortId(selectedBooking.ownerId)}</strong>
+                      </div>
+                    </>
+                  )}
+                  {selectedBooking.lockExpiresAt && (
+                    <div className="booking-detail-item">
+                      <span>Room Lock Expires</span>
+                      <strong>{formatDateTime(selectedBooking.lockExpiresAt)}</strong>
+                    </div>
+                  )}
+                  {selectedBooking.failureReason && (
+                    <div className="booking-detail-item issue">
+                      <span>Failure Reason</span>
+                      <strong>{selectedBooking.failureReason}</strong>
+                    </div>
+                  )}
+                </div>
+
+                <div className="booking-detail-actions">
+                  <button type="button" className="icon-button" onClick={() => domainApi.bookings.getPaymentStatus(selectedBooking.id).then((payload) => setNotice(`Payment: ${payload.paymentStatus}; Booking: ${payload.status}`)).catch((error) => setNotice(error.message))}>
+                    <CreditCard size={16} />
+                    <span>Check Payment</span>
+                  </button>
+                  {["PENDING_PAYMENT", "CONFIRMED"].includes(selectedBooking.status) && (
+                    <button type="button" className="icon-button" onClick={() => cancelBooking(selectedBooking.id)} disabled={loading}>
+                      <Trash2 size={16} />
+                      <span>Cancel Booking</span>
+                    </button>
+                  )}
+                  <button type="button" className="primary-button" onClick={() => navigate("hotels")}>
+                    Book Another Room
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="empty-state">No bookings yet. Create a booking from the hotel screen.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="panel-block booking-table-panel">
+          <div className="section-title">
+            <CreditCard size={18} />
+            <h2>Booking Ledger</h2>
+          </div>
+          <div className="booking-ledger">
+            <div className="booking-ledger-head">
+              <span>Booking</span>
+              <span>Dates</span>
+              <span>Payment</span>
+              <span>Amount</span>
+            </div>
+            {visibleBookings.map((booking) => (
+              <button key={booking.id} type="button" className="booking-ledger-row" onClick={() => setSelectedBookingId(booking.id)}>
+                <span>{booking.id}</span>
+                <span>{formatDate(booking.checkInDate)} - {formatDate(booking.checkOutDate)}</span>
+                <span className={`status-badge status-${statusClass(booking.paymentStatus)}`}>{booking.paymentStatus}</span>
+                <strong>{money(booking.totalAmount)}</strong>
+              </button>
+            ))}
+            {visibleBookings.length === 0 && <p className="empty-state">No ledger rows for this filter.</p>}
           </div>
         </div>
       </div>
     );
   }
-
   function renderWalletPage() {
     return (
       <div className="single-page page-stack">
@@ -997,7 +1355,7 @@ function App() {
     }
 
     return (
-      <div className="single-page">
+      <div className="single-page inventory-page">
         {userCrudLockedByBooking && (
           <div className="panel-block narrow-panel crud-lock-note">
             <div className="section-title">
@@ -1009,25 +1367,48 @@ function App() {
           </div>
         )}
 
-        <div className="owner-band">
-          <form className="panel-block" onSubmit={createHotel}>
+        <div className="inventory-toolbar panel-block">
+          <div className="section-title">
+            <Building2 size={18} />
+            <h2>Inventory Control</h2>
+          </div>
+          <div className="summary-grid inventory-summary">
+            <div className="summary-tile">
+              <span>Managed Hotels</span>
+              <strong>{managerHotels.length}</strong>
+            </div>
+            <div className="summary-tile">
+              <span>Selected Rooms</span>
+              <strong>{managerRooms.length}</strong>
+            </div>
+            <div className="summary-tile">
+              <span>Access</span>
+              <strong>{activeRole}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="owner-band inventory-grid">
+          <form className="panel-block crud-panel" onSubmit={createHotel}>
             <div className="section-title">
               <Building2 size={18} />
-              <h2>{user.role.toUpperCase()} Hotel Dashboard (CRUD)</h2>
+              <h2>Hotels</h2>
             </div>
-            <input placeholder="Hotel name" value={createHotelForm.name} onChange={(event) => setCreateHotelForm({ ...createHotelForm, name: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input placeholder="City" value={createHotelForm.city} onChange={(event) => setCreateHotelForm({ ...createHotelForm, city: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input placeholder="Country" value={createHotelForm.country} onChange={(event) => setCreateHotelForm({ ...createHotelForm, country: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input placeholder="Address" value={createHotelForm.address} onChange={(event) => setCreateHotelForm({ ...createHotelForm, address: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input placeholder="Description" value={createHotelForm.description} onChange={(event) => setCreateHotelForm({ ...createHotelForm, description: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input placeholder="Amenities, comma separated" value={createHotelForm.amenities} onChange={(event) => setCreateHotelForm({ ...createHotelForm, amenities: event.target.value })} disabled={userCrudLockedByBooking} />
+            <div className="crud-form-grid">
+              <label>Hotel name<input placeholder="Hotel name" value={createHotelForm.name} onChange={(event) => setCreateHotelForm({ ...createHotelForm, name: event.target.value })} disabled={userCrudLockedByBooking} /></label>
+              <label>City<input placeholder="City" value={createHotelForm.city} onChange={(event) => setCreateHotelForm({ ...createHotelForm, city: event.target.value })} disabled={userCrudLockedByBooking} /></label>
+              <label>Country<input placeholder="Country" value={createHotelForm.country} onChange={(event) => setCreateHotelForm({ ...createHotelForm, country: event.target.value })} disabled={userCrudLockedByBooking} /></label>
+              <label>Address<input placeholder="Address" value={createHotelForm.address} onChange={(event) => setCreateHotelForm({ ...createHotelForm, address: event.target.value })} disabled={userCrudLockedByBooking} /></label>
+              <label className="wide-field">Description<input placeholder="Description" value={createHotelForm.description} onChange={(event) => setCreateHotelForm({ ...createHotelForm, description: event.target.value })} disabled={userCrudLockedByBooking} /></label>
+              <label className="wide-field">Amenities<input placeholder="Wifi, parking, breakfast" value={createHotelForm.amenities} onChange={(event) => setCreateHotelForm({ ...createHotelForm, amenities: event.target.value })} disabled={userCrudLockedByBooking} /></label>
+            </div>
             <button className="primary-button" disabled={loading || userCrudLockedByBooking}>Create Hotel</button>
 
             <div className="table-list manager-list">
               {managerHotels.map((hotel) => {
                 const edit = hotelEdits[hotel.id];
                 return (
-                  <div className="manager-card" key={hotel.id}>
+                  <div className={selectedHotelId === hotel.id ? "manager-card selected" : "manager-card"} key={hotel.id}>
                     {edit ? (
                       <>
                         <input value={edit.name} onChange={(event) => setHotelField(hotel.id, "name", event.target.value)} />
@@ -1059,10 +1440,11 @@ function App() {
                         <strong>{hotel.name}</strong>
                         <span>{hotel.city}, {hotel.country}</span>
                         <span>{hotel.address || "No address"}</span>
+                        <span className={hotel.isActive ? "inventory-state active" : "inventory-state inactive"}>{hotel.isActive ? "Active" : "Inactive"}</span>
                         <div className="row-actions">
                           <button
                             type="button"
-                            className="icon-button"
+                            className={selectedHotelId === hotel.id ? "icon-button filled" : "icon-button"}
                             onClick={() => {
                               setSelectedHotelId(hotel.id);
                               loadManagerRooms(hotel.id).catch((error) => setNotice(error.message));
@@ -1074,7 +1456,10 @@ function App() {
                           <button type="button" className="icon-button" onClick={() => beginEditHotel(hotel)} title="Edit hotel">
                             <Pencil size={16} />
                           </button>
-                          <button type="button" className="icon-button" onClick={() => removeHotel(hotel.id)} title="Delete hotel" disabled={userCrudLockedByBooking}>
+                          <button type="button" className="icon-button" onClick={() => setHotelActive(hotel.id, !hotel.isActive)} title={hotel.isActive ? "Deactivate hotel" : "Activate hotel"} disabled={userCrudLockedByBooking || loading}>
+                            {hotel.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button type="button" className="icon-button" onClick={() => removeHotel(hotel.id)} title="Deactivate hotel and rooms" disabled={userCrudLockedByBooking}>
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -1083,30 +1468,36 @@ function App() {
                   </div>
                 );
               })}
-              {managerHotels.length === 0 && <p>No managed hotels yet.</p>}
+              {managerHotels.length === 0 && <p className="empty-state">No managed hotels yet. Create a hotel to start adding rooms.</p>}
             </div>
           </form>
 
-          <form className="panel-block" onSubmit={createRoom}>
+          <form className="panel-block crud-panel" onSubmit={createRoom}>
             <div className="section-title">
               <BedDouble size={18} />
-              <h2>{user.role.toUpperCase()} Room Dashboard (CRUD)</h2>
+              <h2>Rooms</h2>
             </div>
-            <select value={selectedHotelId} onChange={(event) => setSelectedHotelId(event.target.value)} disabled={userCrudLockedByBooking}>
-              <option value="">Select hotel</option>
-              {managerHotels.map((hotel) => (
-                <option key={hotel.id} value={hotel.id}>{hotel.name} · {hotel.city}</option>
-              ))}
-            </select>
-            <input placeholder="Room number" value={createRoomForm.roomNumber} onChange={(event) => setCreateRoomForm({ ...createRoomForm, roomNumber: event.target.value })} disabled={userCrudLockedByBooking} />
-            <select value={createRoomForm.type} onChange={(event) => setCreateRoomForm({ ...createRoomForm, type: event.target.value })} disabled={userCrudLockedByBooking}>
-              <option value="STANDARD">Standard</option>
-              <option value="DELUXE">Deluxe</option>
-              <option value="SUITE">Suite</option>
-            </select>
-            <input type="number" min="1" value={createRoomForm.capacity} onChange={(event) => setCreateRoomForm({ ...createRoomForm, capacity: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input type="number" min="1" value={createRoomForm.pricePerNight} onChange={(event) => setCreateRoomForm({ ...createRoomForm, pricePerNight: event.target.value })} disabled={userCrudLockedByBooking} />
-            <input placeholder="Amenities, comma separated" value={createRoomForm.amenities} onChange={(event) => setCreateRoomForm({ ...createRoomForm, amenities: event.target.value })} disabled={userCrudLockedByBooking} />
+            <label>Hotel
+              <select value={selectedHotelId} onChange={(event) => setSelectedHotelId(event.target.value)} disabled={userCrudLockedByBooking}>
+                <option value="">Select hotel</option>
+                {managerHotels.map((hotel) => (
+                  <option key={hotel.id} value={hotel.id}>{hotel.name} · {hotel.city}</option>
+                ))}
+              </select>
+            </label>
+            <div className="crud-form-grid">
+              <label>Room number<input placeholder="101" value={createRoomForm.roomNumber} onChange={(event) => setCreateRoomForm({ ...createRoomForm, roomNumber: event.target.value })} disabled={userCrudLockedByBooking || !selectedHotelId} /></label>
+              <label>Type
+                <select value={createRoomForm.type} onChange={(event) => setCreateRoomForm({ ...createRoomForm, type: event.target.value })} disabled={userCrudLockedByBooking || !selectedHotelId}>
+                  <option value="STANDARD">Standard</option>
+                  <option value="DELUXE">Deluxe</option>
+                  <option value="SUITE">Suite</option>
+                </select>
+              </label>
+              <label>Capacity<input type="number" min="1" value={createRoomForm.capacity} onChange={(event) => setCreateRoomForm({ ...createRoomForm, capacity: event.target.value })} disabled={userCrudLockedByBooking || !selectedHotelId} /></label>
+              <label>Price/night<input type="number" min="1" value={createRoomForm.pricePerNight} onChange={(event) => setCreateRoomForm({ ...createRoomForm, pricePerNight: event.target.value })} disabled={userCrudLockedByBooking || !selectedHotelId} /></label>
+              <label className="wide-field">Amenities<input placeholder="Balcony, desk, minibar" value={createRoomForm.amenities} onChange={(event) => setCreateRoomForm({ ...createRoomForm, amenities: event.target.value })} disabled={userCrudLockedByBooking || !selectedHotelId} /></label>
+            </div>
             <button className="primary-button" disabled={loading || !selectedHotelId || userCrudLockedByBooking}>Create Room</button>
 
             <div className="table-list manager-list">
@@ -1148,11 +1539,15 @@ function App() {
                         <strong>#{room.roomNumber} · {room.type}</strong>
                         <span>{room.capacity} guests · ${room.pricePerNight}/night</span>
                         <span>{toAmenitiesText(room.amenities) || "No amenities"}</span>
+                        <span className={room.isActive ? "inventory-state active" : "inventory-state inactive"}>{room.isActive ? "Active" : "Inactive"}</span>
                         <div className="row-actions">
                           <button type="button" className="icon-button" onClick={() => beginEditRoom(room)} title="Edit room">
                             <Pencil size={16} />
                           </button>
-                          <button type="button" className="icon-button" onClick={() => removeRoom(room.id)} title="Delete room" disabled={userCrudLockedByBooking}>
+                          <button type="button" className="icon-button" onClick={() => setRoomActive(room.id, !room.isActive)} title={room.isActive ? "Deactivate room" : "Activate room"} disabled={userCrudLockedByBooking || loading}>
+                            {room.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button type="button" className="icon-button" onClick={() => removeRoom(room.id)} title="Deactivate room" disabled={userCrudLockedByBooking}>
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -1161,8 +1556,8 @@ function App() {
                   </div>
                 );
               })}
-              {selectedHotelId && managerRooms.length === 0 && <p>No rooms yet for this hotel.</p>}
-              {!selectedHotelId && <p>Select a hotel to manage rooms.</p>}
+              {selectedHotelId && managerRooms.length === 0 && <p className="empty-state">No rooms yet for this hotel.</p>}
+              {!selectedHotelId && <p className="empty-state">Select a hotel to manage rooms.</p>}
             </div>
           </form>
         </div>

@@ -69,53 +69,54 @@ export class HotelApi {
     if (query.guests) params.set("guests", query.guests);
     params.set("page", query.page || 1);
     params.set("limit", query.limit || 20);
+    if (query.cacheBust) params.set("_t", query.cacheBust);
     return this.client.request(`/api/hotels?${params.toString()}`);
   }
 
   listOwnerHotels() {
-    return this.client.request("/api/owner/hotels");
+    return this.client.request("/api/admin/hotels");
   }
 
   createHotel(payload) {
-    return this.client.request("/api/owner/hotels", {
+    return this.client.request("/api/admin/hotels", {
       method: "POST",
       body: JSON.stringify(payload)
     });
   }
 
   updateHotel(hotelId, payload) {
-    return this.client.request(`/api/owner/hotels/${hotelId}`, {
+    return this.client.request(`/api/admin/hotels/${hotelId}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
   }
 
   deleteHotel(hotelId) {
-    return this.client.request(`/api/owner/hotels/${hotelId}`, {
+    return this.client.request(`/api/admin/hotels/${hotelId}`, {
       method: "DELETE"
     });
   }
 
   listHotelRooms(hotelId) {
-    return this.client.request(`/api/owner/hotels/${hotelId}/rooms`);
+    return this.client.request(`/api/admin/hotels/${hotelId}/rooms`);
   }
 
   createRoom(hotelId, payload) {
-    return this.client.request(`/api/owner/hotels/${hotelId}/rooms`, {
+    return this.client.request(`/api/admin/hotels/${hotelId}/rooms`, {
       method: "POST",
       body: JSON.stringify(payload)
     });
   }
 
   updateRoom(roomId, payload) {
-    return this.client.request(`/api/owner/rooms/${roomId}`, {
+    return this.client.request(`/api/admin/rooms/${roomId}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
   }
 
   deleteRoom(roomId) {
-    return this.client.request(`/api/owner/rooms/${roomId}`, {
+    return this.client.request(`/api/admin/rooms/${roomId}`, {
       method: "DELETE"
     });
   }
@@ -128,6 +129,14 @@ export class BookingApi {
 
   listMine() {
     return this.client.request("/api/bookings/my-bookings");
+  }
+
+  listManaged() {
+    return this.client.request("/api/admin/bookings");
+  }
+
+  listPlatform() {
+    return this.client.request("/api/superadmin/bookings");
   }
 
   create(payload) {

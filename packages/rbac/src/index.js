@@ -19,6 +19,8 @@ const LEGACY_ROLE_MAP = {
   user: Roles.USER,
   admin: Roles.ADMIN,
   superadmin: Roles.SUPERADMIN,
+  super_admin: Roles.SUPERADMIN,
+  "super admin": Roles.SUPERADMIN,
   owner: Roles.ADMIN,
   guest: Roles.USER
 };
@@ -33,6 +35,7 @@ export function normalizeRole(value) {
   const key = String(value).trim();
   if (!key) return Roles.USER;
   if (Object.values(Roles).includes(key)) return key;
+  if (key === "SUPER_ADMIN" || key === "SUPER ADMIN") return Roles.SUPERADMIN;
   return LEGACY_ROLE_MAP[key.toLowerCase()] || Roles.USER;
 }
 
