@@ -16,12 +16,12 @@ const app = express();
 app.set("trust proxy", process.env.TRUST_PROXY || 1);
 
 const services = {
-  auth: env("AUTH_SERVICE_URL", "http://localhost:4001"),
-  user: env("USER_SERVICE_URL", "http://localhost:4002"),
-  hotel: env("HOTEL_SERVICE_URL", "http://localhost:4003"),
-  booking: env("BOOKING_SERVICE_URL", "http://localhost:4004"),
-  wallet: env("WALLET_SERVICE_URL", "http://localhost:4005"),
-  admin: env("ADMIN_SERVICE_URL", "http://localhost:4006")
+  auth: env("AUTH_SERVICE_URL", "http://127.0.0.1:4001"),
+  user: env("USER_SERVICE_URL", "http://127.0.0.1:4002"),
+  hotel: env("HOTEL_SERVICE_URL", "http://127.0.0.1:4003"),
+  booking: env("BOOKING_SERVICE_URL", "http://127.0.0.1:4004"),
+  wallet: env("WALLET_SERVICE_URL", "http://127.0.0.1:4005"),
+  admin: env("ADMIN_SERVICE_URL", "http://127.0.0.1:4006")
 };
 
 app.use(helmet());

@@ -7,7 +7,7 @@
 import { z } from "zod";
 
 export const topUpSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.coerce.number().positive(),
   idempotencyKey: z.string().min(8)
 });
 

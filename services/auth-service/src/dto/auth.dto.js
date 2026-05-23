@@ -5,17 +5,16 @@
  */
 
 import { z } from "zod";
-import { normalizeRole, Roles } from "@hotel-booking/rbac";
+import { Roles } from "@hotel-booking/rbac";
 
 export const signupSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
   role: z
-    .string()
+    .any()
     .default(Roles.USER)
-    .transform(normalizeRole)
-    .refine((role) => [Roles.USER, Roles.ADMIN, Roles.SUPERADMIN].includes(role), "Invalid role"),
+    .transform(() => Roles.USER),
   phone: z.string().optional()
 });
 

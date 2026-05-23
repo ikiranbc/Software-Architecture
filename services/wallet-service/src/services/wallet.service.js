@@ -15,7 +15,7 @@ import {
 
 function bookingServiceBaseUrls() {
   const configured = process.env.BOOKING_SERVICE_URL;
-  return [...new Set([configured, "http://booking-service:4004", "http://localhost:4004"].filter(Boolean))];
+  return [...new Set([configured, "http://booking-service:4004", "http://127.0.0.1:4004"].filter(Boolean))];
 }
 
 function isNetworkFetchError(error) {

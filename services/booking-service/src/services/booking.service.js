@@ -75,7 +75,7 @@ function roomLockKey(roomId, checkInDate, checkOutDate) {
 }
 
 async function fetchRoom(roomId) {
-  const baseUrl = process.env.HOTEL_SERVICE_URL || "http://localhost:4003";
+  const baseUrl = process.env.HOTEL_SERVICE_URL || "http://127.0.0.1:4003";
   const response = await fetch(`${baseUrl}/internal/rooms/${roomId}`);
   if (!response.ok) throw httpError(400, "Selected room is not available", "ROOM_UNAVAILABLE");
   return response.json();
@@ -204,6 +204,7 @@ export async function cancelBookingForUser(user, bookingId) {
   }
 
   if (!["PENDING_PAYMENT", "CONFIRMED"].includes(booking.status)) {
+    if (booking.status === "CANCELLED") return serializeBooking(booking);
     throw httpError(400, "Only pending or confirmed bookings can be cancelled", "INVALID_STATUS");
   }
 

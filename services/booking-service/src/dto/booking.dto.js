@@ -10,7 +10,7 @@ export const createBookingSchema = z.object({
   roomId: z.string().min(1),
   checkInDate: z.coerce.date(),
   checkOutDate: z.coerce.date(),
-  guests: z.number().int().positive(),
+  guests: z.coerce.number().int().positive(),
   idempotencyKey: z.string().min(8)
 });
 

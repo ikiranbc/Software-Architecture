@@ -6,6 +6,15 @@
 
 import { z } from "zod";
 
+const optionalBooleanSchema = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return value;
+}, z.boolean().optional());
+
 export const createHotelSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
@@ -18,10 +27,10 @@ export const createHotelSchema = z.object({
 export const createRoomSchema = z.object({
   roomNumber: z.string().min(1),
   type: z.string().transform((value) => value.toUpperCase()).pipe(z.enum(["STANDARD", "DELUXE", "SUITE"])),
-  capacity: z.number().int().positive(),
-  pricePerNight: z.number().positive(),
+  capacity: z.coerce.number().int().positive(),
+  pricePerNight: z.coerce.number().positive(),
   amenities: z.array(z.string()).default([]),
-  isActive: z.boolean().optional()
+  isActive: optionalBooleanSchema
 });
 
 export const updateHotelSchema = createHotelSchema.partial();

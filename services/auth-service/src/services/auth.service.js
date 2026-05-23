@@ -12,7 +12,7 @@ import {
   signToken,
   verifyRefreshToken
 } from "@hotel-booking/shared-utils";
-import { normalizeStatus, UserStatuses } from "@hotel-booking/rbac";
+import { normalizeRole, normalizeStatus, UserStatuses } from "@hotel-booking/rbac";
 import { createUser, findUserByEmail } from "../repositories/user.repository.js";
 
 function publicUser(user) {
@@ -20,9 +20,9 @@ function publicUser(user) {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
-    role: user.role,
+    role: normalizeRole(user.role),
     phone: user.phone,
-    status: user.status
+    status: normalizeStatus(user.status)
   };
 }
 

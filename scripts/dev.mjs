@@ -28,13 +28,13 @@ const sharedEnv = {
   GATEWAY_PORT: gatewayPort,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || "http://localhost:5173",
   VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || process.env.API_BASE_URL || `http://localhost:${gatewayPort}`,
-  AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || "http://localhost:4001",
-  USER_SERVICE_URL: process.env.USER_SERVICE_URL || "http://localhost:4002",
-  HOTEL_SERVICE_URL: process.env.HOTEL_SERVICE_URL || "http://localhost:4003",
-  BOOKING_SERVICE_URL: process.env.BOOKING_SERVICE_URL || "http://localhost:4004",
-  WALLET_SERVICE_URL: process.env.WALLET_SERVICE_URL || "http://localhost:4005",
-  ADMIN_SERVICE_URL: process.env.ADMIN_SERVICE_URL || "http://localhost:4006",
-  NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || "http://localhost:4007"
+  AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || "http://127.0.0.1:4001",
+  USER_SERVICE_URL: process.env.USER_SERVICE_URL || "http://127.0.0.1:4002",
+  HOTEL_SERVICE_URL: process.env.HOTEL_SERVICE_URL || "http://127.0.0.1:4003",
+  BOOKING_SERVICE_URL: process.env.BOOKING_SERVICE_URL || "http://127.0.0.1:4004",
+  WALLET_SERVICE_URL: process.env.WALLET_SERVICE_URL || "http://127.0.0.1:4005",
+  ADMIN_SERVICE_URL: process.env.ADMIN_SERVICE_URL || "http://127.0.0.1:4006",
+  NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || "http://127.0.0.1:4007"
 };
 
 const workspaces = [
@@ -47,6 +47,18 @@ const workspaces = [
   ["notification", "services/notification-service"],
   ["gateway", "apps/api-gateway"],
   ["client", "apps/client"]
+];
+
+const composeAppServices = [
+  "client",
+  "api-gateway",
+  "auth-service",
+  "user-service",
+  "hotel-service",
+  "booking-service",
+  "wallet-service",
+  "admin-service",
+  "notification-service"
 ];
 
 function prefix(name, index, data) {
@@ -102,6 +114,9 @@ if (process.env.NO_DOCKER_INFRA !== "1") {
     console.log("[dev] If MongoDB, Redis, and RabbitMQ are already running locally, use NO_DOCKER_INFRA=1 npm start.");
     process.exit(1);
   }
+
+  console.log("[dev] stopping Docker app containers so localhost routes to local Node services");
+  await runOnce("infra", "docker", ["compose", "stop", ...composeAppServices]);
 }
 
 if (process.env.SKIP_DEV_SEED !== "1") {

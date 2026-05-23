@@ -1,5 +1,5 @@
 import { hashPassword, httpError } from "@hotel-booking/shared-utils";
-import { Roles, UserStatuses } from "@hotel-booking/rbac";
+import { normalizeRole, normalizeStatus, Roles, UserStatuses } from "@hotel-booking/rbac";
 import {
   aggregatePlatformSummary,
   aggregateRevenue,
@@ -36,9 +36,9 @@ function serializeUser(user) {
     id: toIdString(user?._id),
     name: user.name,
     email: user.email,
-    role: user.role,
+    role: normalizeRole(user.role),
     phone: user.phone,
-    status: user.status,
+    status: normalizeStatus(user.status),
     createdAt: user.createdAt
   };
 }
